@@ -1,0 +1,6 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+judging/smoke_test/results/
+corpus_gen/results/
