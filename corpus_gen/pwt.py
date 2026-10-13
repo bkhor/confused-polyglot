@@ -77,6 +77,41 @@ def pwt_hop(word: str, current_flores: str, pool: list[str], retention_p: float,
     return new_word, tgt_flores, lang_code
 
 
+def pwt_hop_batch(state: list[dict], pool: list[str], retention_p: float, rng: random.Random) -> tuple:
+    n = len(state)
+    lang_codes = [None] * n
+    tgt_flores_list = [None] * n
+
+    for i, s in enumerate(state):
+        if rng.random() < retention_p:
+            lang_codes[i] = "en"
+        else:
+            lc = rng.choice(pool)
+            lang_codes[i] = lc
+            tgt_flores_list[i] = FLORES_CODES[lc]
+
+    new_words = [None] * n
+    new_flores = [None] * n
+    groups = {}
+
+    for i, s in enumerate(state):
+        if lang_codes[i] == "en":
+            new_words[i] = s["word"]
+            new_flores[i] = s["flores"]
+        else:
+            key = (s["flores"], tgt_flores_list[i])
+            groups.setdefault(key, []).append(i)
+
+    for (src_flores, tgt_flores), indices in groups.items():
+        batch_words = [state[i]["word"] for i in indices]
+        translated = translator.translate_batch(batch_words, src_flores, tgt_flores)
+        for idx, t in zip(indices, translated):
+            new_words[idx] = t
+            new_flores[idx] = tgt_flores
+
+    return new_words, new_flores, lang_codes
+
+
 def pwt_generate(
     text: str,
     pool: list[str],
@@ -97,17 +132,12 @@ def pwt_generate(
     ]
 
     for gen in range(1, iterations + 1):
-        new_state = []
-        assignments = []
-        for s in state:
-            new_word, new_flores, lang_code = pwt_hop(s["word"], s["flores"], pool, retention_p, rng)
-            new_state.append({"word": new_word, "flores": new_flores})
-            assignments.append(lang_code)
-        state = new_state
+        new_words, new_flores, assignments = pwt_hop_batch(state, pool, retention_p, rng)
+        state = [{"word": w, "flores": f} for w, f in zip(new_words, new_flores)]
         trajectory.append(
             {
                 "generation": gen,
-                "text": " ".join(s["word"] for s in state),
+                "text": " ".join(new_words),
                 "word_language_assignments": assignments,
             }
         )
