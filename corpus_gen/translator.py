@@ -27,6 +27,7 @@ def load_model(model_name: str | None = None) -> None:
     _tokenizer = AutoTokenizer.from_pretrained(model_name)
     _model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
     _model.eval()
+    _model.generation_config.max_length = None
     _loaded_model_name = model_name
 
 
