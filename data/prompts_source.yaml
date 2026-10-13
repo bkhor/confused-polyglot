@@ -1,0 +1,199 @@
+- item_id: META-01
+  condition: meta
+  roles: [core_grid]
+  text: >-
+    I have written a simple text in which every word is translated into a randomly chosen
+    language, drawn from a pool of about thirty. I then submitted the results to several of
+    the main models, including frontier ones, and asked them to decode it. Since each word is
+    translated separately, I would guess that a great deal of context is lost. Even so, can the
+    models still recognise what the original text was about? Tell me what you think the
+    original text said.
+  instruction_sentence: "Tell me what you think the original text said."
+  contains_proper_noun: false
+  explicitly_told_degraded: false
+  expected_answer: null
+  accept_set: null
+  language_origin: en
+
+- item_id: META-02
+  condition: meta
+  roles: [core_grid]
+  text: >-
+    This message is part of an experiment about machine translation. Each word you are reading
+    was converted separately into a different language, so the grammar and word order you would
+    normally rely on are gone. Only the individual words remain, and even those have drifted.
+    The question I want to answer is how much meaning survives that process. Describe, in your
+    own words, what this message was originally asking.
+  instruction_sentence: "Describe, in your own words, what this message was originally asking."
+  contains_proper_noun: false
+  explicitly_told_degraded: true
+  expected_answer: null
+  accept_set: null
+  language_origin: en
+
+- item_id: NAR-01
+  condition: narrative_task
+  roles: [core_grid]
+  text: >-
+    The lighthouse at Carrick Point ran unattended for the first time in ninety years. The last
+    keeper, a man named Brennan, had climbed the spiral stair twice a night since he was
+    twenty-three, trimming the wick in the early years and later only checking that the
+    automatic lamp had turned. On his final evening he carried up a chair, sat beside the
+    lantern, and watched the beam sweep the water until dawn. The following week a technician
+    arrived from the mainland, installed a remote monitor, and locked the door behind him. The
+    light has not failed since. Summarise this passage in one sentence.
+  instruction_sentence: "Summarise this passage in one sentence."
+  contains_proper_noun: true
+  explicitly_told_degraded: false
+  expected_answer: null
+  accept_set: null
+  language_origin: en
+
+- item_id: NAR-02
+  condition: narrative_task
+  roles: [core_grid]
+  text: >-
+    Every autumn the market square filled with crates of apples brought down from the orchards
+    on the ridge. Growers argued over prices while children ran between the stalls collecting
+    the fruit that rolled loose. By the third day the square smelled of cider and wet straw, and
+    the stone cobbles were slick with it. The festival ended when the last crate was sold,
+    usually around dusk, and by the next morning the square was swept clean and empty again, as
+    though none of it had happened. Summarise this passage in one sentence.
+  instruction_sentence: "Summarise this passage in one sentence."
+  contains_proper_noun: false
+  explicitly_told_degraded: false
+  expected_answer: null
+  accept_set: null
+  language_origin: en
+
+- item_id: SAL-01
+  condition: word_salad
+  roles: [core_grid]
+  text: "apple hello never again today what yellow zero stop four did"
+  instruction_sentence: null
+  contains_proper_noun: false
+  explicitly_told_degraded: false
+  expected_answer: null
+  accept_set: null
+  language_origin: en
+
+- item_id: SAL-02
+  condition: word_salad
+  roles: [core_grid]
+  text: "pencil nine outside always purple river finish twelve soft morning run"
+  instruction_sentence: null
+  contains_proper_noun: false
+  explicitly_told_degraded: false
+  expected_answer: null
+  accept_set: null
+  language_origin: en
+
+- item_id: CAL-01
+  condition: short_instruction
+  roles: [core_grid, calibration_anchor]
+  text: "What is the capital of Japan? Answer in one word."
+  instruction_sentence: "Answer in one word."
+  contains_proper_noun: true
+  explicitly_told_degraded: false
+  expected_answer: "Tokyo"
+  accept_set: ["tokyo", "tōkyō"]
+  language_origin: en
+
+- item_id: CAL-02
+  condition: short_instruction
+  roles: [core_grid, calibration_anchor]
+  text: "How many legs does a spider have? Answer with a number."
+  instruction_sentence: "Answer with a number."
+  contains_proper_noun: false
+  explicitly_told_degraded: false
+  expected_answer: "8"
+  accept_set: ["8", "eight"]
+  language_origin: en
+
+- item_id: CAL-03
+  condition: short_instruction
+  roles: [calibration_anchor]
+  text: "What colour is the sky on a clear day? Answer in one word."
+  instruction_sentence: "Answer in one word."
+  contains_proper_noun: false
+  explicitly_told_degraded: false
+  expected_answer: "blue"
+  accept_set: ["blue"]
+  language_origin: en
+
+- item_id: CAL-04
+  condition: short_instruction
+  roles: [calibration_anchor]
+  text: "Name the largest planet in the solar system. One word."
+  instruction_sentence: "One word."
+  contains_proper_noun: true
+  explicitly_told_degraded: false
+  expected_answer: "Jupiter"
+  accept_set: ["jupiter"]
+  language_origin: en
+
+- item_id: CAL-05
+  condition: short_instruction
+  roles: [calibration_anchor]
+  text: "How many days are in a week? Answer with a number."
+  instruction_sentence: "Answer with a number."
+  contains_proper_noun: false
+  explicitly_told_degraded: false
+  expected_answer: "7"
+  accept_set: ["7", "seven"]
+  language_origin: en
+
+- item_id: CAL-06
+  condition: short_instruction
+  roles: [calibration_anchor]
+  text: "What is the opposite of hot? Answer in one word."
+  instruction_sentence: "Answer in one word."
+  contains_proper_noun: false
+  explicitly_told_degraded: false
+  expected_answer: "cold"
+  accept_set: ["cold", "cool"]
+  language_origin: en
+
+- item_id: CAL-07
+  condition: short_instruction
+  roles: [calibration_anchor]
+  text: "What is frozen water called? Answer in one word."
+  instruction_sentence: "Answer in one word."
+  contains_proper_noun: false
+  explicitly_told_degraded: false
+  expected_answer: "ice"
+  accept_set: ["ice"]
+  language_origin: en
+
+- item_id: CAL-08
+  condition: short_instruction
+  roles: [calibration_anchor]
+  text: "How many sides does a triangle have? Answer with a number."
+  instruction_sentence: "Answer with a number."
+  contains_proper_noun: false
+  explicitly_told_degraded: false
+  expected_answer: "3"
+  accept_set: ["3", "three"]
+  language_origin: en
+
+- item_id: CAL-09
+  condition: short_instruction
+  roles: [calibration_anchor]
+  text: "On which continent is Egypt? Answer in one word."
+  instruction_sentence: "Answer in one word."
+  contains_proper_noun: true
+  explicitly_told_degraded: false
+  expected_answer: "Africa"
+  accept_set: ["africa"]
+  language_origin: en
+
+- item_id: CAL-10
+  condition: short_instruction
+  roles: [calibration_anchor]
+  text: "Who wrote the play Hamlet? Answer with a surname."
+  instruction_sentence: "Answer with a surname."
+  contains_proper_noun: true
+  explicitly_told_degraded: false
+  expected_answer: "Shakespeare"
+  accept_set: ["shakespeare"]
+  language_origin: en

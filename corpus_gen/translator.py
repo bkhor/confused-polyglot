@@ -35,6 +35,11 @@ def current_model_name() -> str:
     return _loaded_model_name or DEFAULT_MODEL
 
 
+def count_tokens(text: str, model_name: str | None = None) -> int:
+    load_model(model_name)
+    return len(_tokenizer(text)["input_ids"])
+
+
 def translate_batch(
     words: list[str],
     src_flores: str,
