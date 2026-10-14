@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -72,7 +73,7 @@ def build_request(rubric_text: str, user_message: str, call_type: str) -> dict:
     tool = OUTCOME_TOOL if call_type == "outcome" else COMPREHENSION_TOOL
     return dict(
         model=JUDGE_MODEL,
-        max_tokens=512,
+        max_tokens=1024,
         tools=[tool],
         system=[
             {
@@ -81,7 +82,7 @@ def build_request(rubric_text: str, user_message: str, call_type: str) -> dict:
                 "cache_control": {"type": "ephemeral"},
             }
         ],
-        tool_choice={"type": "auto"},
+        tool_choice={"type": "tool", "name": tool["name"]},
         messages=[{"role": "user", "content": user_message}],
     )
 
@@ -255,14 +256,18 @@ def run_synchronous(client, pending, out_path: Path):
             out.flush()
 
 
-def load_batch_state() -> dict | None:
+MAX_BATCH_BYTES = 150 * 1024 * 1024  # safety margin under the API's 256MB cap
+
+
+def load_batch_state() -> tuple[list[str], dict]:
     if not BATCH_STATE_PATH.exists():
-        return None
-    return json.loads(BATCH_STATE_PATH.read_text())
+        return [], {}
+    state = json.loads(BATCH_STATE_PATH.read_text())
+    return state["batch_ids"], state["id_map"]
 
 
-def save_batch_state(batch_id: str) -> None:
-    BATCH_STATE_PATH.write_text(json.dumps({"batch_id": batch_id}))
+def save_batch_state(batch_ids: list[str], id_map: dict) -> None:
+    BATCH_STATE_PATH.write_text(json.dumps({"batch_ids": batch_ids, "id_map": id_map}))
 
 
 def clear_batch_state() -> None:
@@ -270,15 +275,36 @@ def clear_batch_state() -> None:
         BATCH_STATE_PATH.unlink()
 
 
-def submit_batch(client, pending) -> str:
-    requests = [
-        {"custom_id": f"{response_id}::{call_type}", "params": request}
-        for response_id, call_type, request in pending
-    ]
-    batch = client.messages.batches.create(requests=requests)
-    print(f"Submitted batch {batch.id} ({len(requests)} requests)")
-    save_batch_state(batch.id)
-    return batch.id
+def make_custom_id(response_id: str, call_type: str) -> str:
+    return hashlib.sha256(f"{response_id}|{call_type}".encode()).hexdigest()[:32]
+
+
+def chunk_by_size(pending, max_bytes: int):
+    chunk = []
+    chunk_bytes = 0
+    for response_id, call_type, request in pending:
+        payload = {"custom_id": make_custom_id(response_id, call_type), "params": request}
+        size = len(json.dumps(payload).encode("utf-8"))
+        if chunk and chunk_bytes + size > max_bytes:
+            yield chunk
+            chunk = []
+            chunk_bytes = 0
+        chunk.append(payload)
+        chunk_bytes += size
+    if chunk:
+        yield chunk
+
+
+def submit_batches(client, pending) -> tuple[list[str], dict]:
+    id_map = {make_custom_id(response_id, call_type): [response_id, call_type] for response_id, call_type, _ in pending}
+    batch_ids = []
+    chunks = list(chunk_by_size(pending, MAX_BATCH_BYTES))
+    for i, chunk in enumerate(chunks, 1):
+        batch = client.messages.batches.create(requests=chunk)
+        print(f"Submitted batch {batch.id} ({i}/{len(chunks)}, {len(chunk)} requests)")
+        batch_ids.append(batch.id)
+        save_batch_state(batch_ids, id_map)
+    return batch_ids, id_map
 
 
 def wait_for_batch(client, batch_id: str):
@@ -295,16 +321,15 @@ def wait_for_batch(client, batch_id: str):
         time.sleep(POLL_INTERVAL_SECONDS)
 
 
-def write_batch_results(client, batch_id: str, out_path: Path) -> None:
+def write_batch_results(client, batch_id: str, id_map: dict, out_path: Path) -> None:
     with open(out_path, "a") as out:
         for item in client.messages.batches.results(batch_id):
-            response_id, call_type = item.custom_id.split("::")
+            response_id, call_type = id_map[item.custom_id]
             if item.result.type == "succeeded":
                 row = parse_tool_result(response_id, call_type, item.result.message, None)
             else:
                 row = parse_tool_result(response_id, call_type, None, f"{item.result.type}: {getattr(item.result, 'error', '')}")
             out.write(json.dumps(row) + "\n")
-    clear_batch_state()
 
 
 def main():
@@ -338,16 +363,20 @@ def main():
         print(f"\nDone. Results in {JUDGED_PATH}")
         return
 
-    state = load_batch_state()
-    if state:
-        print(f"Resuming existing batch {state['batch_id']}")
-        batch_id = state["batch_id"]
+    batch_ids, id_map = load_batch_state()
+    if batch_ids:
+        print(f"Resuming {len(batch_ids)} in-flight batch(es)")
     else:
-        print(f"{len(pending)} calls pending, submitting as a batch")
-        batch_id = submit_batch(client, pending)
+        print(f"{len(pending)} calls pending, submitting as batches")
+        batch_ids, id_map = submit_batches(client, pending)
 
-    wait_for_batch(client, batch_id)
-    write_batch_results(client, batch_id, JUDGED_PATH)
+    for batch_id in list(batch_ids):
+        wait_for_batch(client, batch_id)
+        write_batch_results(client, batch_id, id_map, JUDGED_PATH)
+        batch_ids.remove(batch_id)
+        save_batch_state(batch_ids, id_map)
+
+    clear_batch_state()
     print(f"\nDone. Results in {JUDGED_PATH}")
 
 

@@ -7,3 +7,5 @@ judging/smoke_test/results/
 corpus_gen/results/
 data/prompts_manifest.yaml
 .DS_Store
+.claude/
+docs/
