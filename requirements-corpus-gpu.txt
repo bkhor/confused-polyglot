@@ -1,0 +1,5 @@
+transformers
+sentencepiece
+pandas
+pyyaml
+matplotlib
