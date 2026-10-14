@@ -1,3 +1,2 @@
 vllm
-bitsandbytes
 pyyaml

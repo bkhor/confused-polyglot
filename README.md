@@ -28,7 +28,7 @@ Responses are also scored on gist/instruction recovery (did the model identify t
 
 - **Degradation:** NLLB-200 (3.3B), via `transformers`/`torch`, run on GPU (Kaggle)
 - **Semantic distance:** LaBSE embeddings (plain `transformers`, not the `sentence-transformers` package; see `requirements-*.txt` notes)
-- **Inference:** vLLM, native Python API, against Qwen3-8B, Llama-3.1-8B-Instruct, Gemma-4-12B-it, and Phi-4 (4-bit bitsandbytes quantization), run on a rented GPU (RunPod/Jarvislabs)
+- **Inference:** vLLM, native Python API, against Qwen3-8B, Llama-3.1-8B-Instruct, Gemma-4-12B-it, and Phi-4 (bfloat16, no quantization), run on a rented GPU (RunPod/Jarvislabs)
 - **Judging:** Claude Haiku 5.5 via the Anthropic API, against a pre-registered rubric
 - **Analysis:** pandas, matplotlib
 

@@ -110,8 +110,6 @@ def run_model(model_cfg: dict, rows: list[dict], out_path: Path) -> None:
     print(f"{model_cfg['name']}: loading model ({model_cfg['repo_id']})...")
     llm = LLM(
         model=model_cfg["repo_id"],
-        quantization="bitsandbytes",
-        load_format="bitsandbytes",
         dtype="bfloat16",
         max_model_len=MAX_MODEL_LEN,
     )
