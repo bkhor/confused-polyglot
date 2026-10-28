@@ -32,6 +32,7 @@ def load_xstest_items() -> list[dict]:
                     "roles": ["xstest_depth"],
                     "text": row["prompt"],
                     "contains_proper_noun": row["contains_proper_noun"] == "True",
+                    "type": row["type"],
                 }
             )
     return items
@@ -54,6 +55,7 @@ def gen0_row(item: dict, seed: int, prompt_id: str) -> dict:
         "prompt_id": prompt_id,
         "item_id": item["item_id"],
         "condition": item["condition"],
+        "type": item.get("type"),
         "chain_type": "gen0",
         "pool_size": None,
         "pool_composition": None,
@@ -95,6 +97,7 @@ def rows_from_pwt_trajectory(
                 "prompt_id": prompt_id,
                 "item_id": item["item_id"],
                 "condition": item["condition"],
+                "type": item.get("type"),
                 "chain_type": "pwt",
                 "pool_size": pool_size,
                 "pool_composition": pool,
@@ -135,6 +138,7 @@ def rows_from_roundtrip_trajectory(item: dict, seed: int, trajectory: list[dict]
                 "prompt_id": prompt_id,
                 "item_id": item["item_id"],
                 "condition": item["condition"],
+                "type": item.get("type"),
                 "chain_type": "roundtrip",
                 "pool_size": None,
                 "pool_composition": None,

@@ -2,8 +2,10 @@
 import argparse
 import hashlib
 import json
+import os
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -61,8 +63,9 @@ COMPREHENSION_TOOL = {
 }
 
 
-def render_user_message(original_prompt: str, degraded_prompt: str, response: str) -> str:
+def render_user_message(original_prompt: str, degraded_prompt: str, response: str, condition: str) -> str:
     return (
+        f"condition:\n{condition}\n\n"
         f"original_prompt:\n{original_prompt}\n\n"
         f"degraded_prompt:\n{degraded_prompt}\n\n"
         f"response:\n{response}"
@@ -116,6 +119,27 @@ def load_prompt_lookups() -> tuple[dict, dict]:
             if row["chain_type"] == "gen0":
                 original_by_item[row["item_id"]] = row["text"]
     return original_by_item, degraded_by_row
+
+
+def summarize_stop_reasons(path: Path) -> Counter:
+    counts = Counter()
+    if not path.exists():
+        return counts
+    with open(path) as f:
+        for line in f:
+            if line.strip():
+                counts[json.loads(line)["stop_reason"]] += 1
+    return counts
+
+
+def print_stop_reason_summary(path: Path) -> None:
+    counts = summarize_stop_reasons(path)
+    normal = counts.pop("tool_use", 0)
+    if counts:
+        print(f"WARNING: non-tool_use stop reasons found in {path.name}:")
+        for reason, count in counts.most_common():
+            print(f"  {reason}: {count}")
+    print(f"({normal} rows stopped normally on tool_use)")
 
 
 def load_existing_keys(path: Path) -> set:
@@ -222,7 +246,7 @@ def build_pending_requests(rows, rubric_text, original_by_item, degraded_by_row,
     for row in rows:
         original_prompt = original_by_item[row["item_id"]]
         degraded_prompt = degraded_by_row[row["corpus_row_id"]]
-        user_message = render_user_message(original_prompt, degraded_prompt, row["response_text"])
+        user_message = render_user_message(original_prompt, degraded_prompt, row["response_text"], row["condition"])
         for call_type in ("outcome", "comprehension"):
             key = (row["response_id"], call_type)
             if key in existing_keys:
@@ -236,7 +260,7 @@ def run_dry_run(rubric_text, original_by_item, degraded_by_row, rows):
     row = rows[0]
     original_prompt = original_by_item[row["item_id"]]
     degraded_prompt = degraded_by_row[row["corpus_row_id"]]
-    user_message = render_user_message(original_prompt, degraded_prompt, row["response_text"])
+    user_message = render_user_message(original_prompt, degraded_prompt, row["response_text"], row["condition"])
     for call_type in ("outcome", "comprehension"):
         request = build_request(rubric_text, user_message, call_type)
         print(f"=== {call_type} call ===")
@@ -267,7 +291,9 @@ def load_batch_state() -> tuple[list[str], dict]:
 
 
 def save_batch_state(batch_ids: list[str], id_map: dict) -> None:
-    BATCH_STATE_PATH.write_text(json.dumps({"batch_ids": batch_ids, "id_map": id_map}))
+    tmp_path = BATCH_STATE_PATH.with_suffix(".json.tmp")
+    tmp_path.write_text(json.dumps({"batch_ids": batch_ids, "id_map": id_map}))
+    os.replace(tmp_path, BATCH_STATE_PATH)
 
 
 def clear_batch_state() -> None:
@@ -322,9 +348,12 @@ def wait_for_batch(client, batch_id: str):
 
 
 def write_batch_results(client, batch_id: str, id_map: dict, out_path: Path) -> None:
+    existing_keys = load_existing_keys(out_path)
     with open(out_path, "a") as out:
         for item in client.messages.batches.results(batch_id):
             response_id, call_type = id_map[item.custom_id]
+            if (response_id, call_type) in existing_keys:
+                continue
             if item.result.type == "succeeded":
                 row = parse_tool_result(response_id, call_type, item.result.message, None)
             else:
@@ -355,12 +384,14 @@ def main():
     pending = build_pending_requests(rows, rubric_text, original_by_item, degraded_by_row, existing_keys)
     if not pending:
         print("Nothing to do, all requested rows already judged.")
+        print_stop_reason_summary(JUDGED_PATH)
         return
 
     if args.limit:
         print(f"{len(pending)} calls pending, running synchronously (--limit set)")
         run_synchronous(client, pending, JUDGED_PATH)
         print(f"\nDone. Results in {JUDGED_PATH}")
+        print_stop_reason_summary(JUDGED_PATH)
         return
 
     batch_ids, id_map = load_batch_state()
@@ -378,6 +409,7 @@ def main():
 
     clear_batch_state()
     print(f"\nDone. Results in {JUDGED_PATH}")
+    print_stop_reason_summary(JUDGED_PATH)
 
 
 if __name__ == "__main__":

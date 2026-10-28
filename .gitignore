@@ -5,6 +5,7 @@ __pycache__/
 *.pyc
 judging/smoke_test/results/
 corpus_gen/results/
+analysis/results/
 data/prompts_manifest.yaml
 .DS_Store
 .claude/

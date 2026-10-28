@@ -4,14 +4,12 @@ import json
 import time
 from pathlib import Path
 
-from vllm import LLM, SamplingParams
-
 INPUT_PATH = "data/inference_input.jsonl"
 OUTPUT_PATH = "data/responses.jsonl"
 
 M_SAMPLES = 5
 TEMPERATURE = 0.7
-MAX_TOKENS = 512
+MAX_TOKENS = 3584
 MAX_MODEL_LEN = 4096
 BATCH_SIZE = 100
 SYSTEM_PROMPT = None
@@ -99,11 +97,23 @@ def mean_logprob_for_completion(completion) -> float | None:
     return sum(token_logprobs) / len(token_logprobs)
 
 
-def run_model(model_cfg: dict, rows: list[dict], out_path: Path) -> None:
-    existing = load_existing_counts(out_path, model_cfg["name"])
-    todo = [r for r in rows if existing.get(r["corpus_row_id"], 0) < M_SAMPLES]
+def rows_with_sample_plan(rows: list[dict], existing: dict, m_samples: int) -> list[tuple[dict, int, int]]:
+    plan = []
+    for row in rows:
+        have = existing.get(row["corpus_row_id"], 0)
+        needed = m_samples - have
+        if needed > 0:
+            plan.append((row, needed, have))
+    return plan
 
-    if not todo:
+
+def run_model(model_cfg: dict, rows: list[dict], out_path: Path) -> None:
+    from vllm import LLM, SamplingParams
+
+    existing = load_existing_counts(out_path, model_cfg["name"])
+    plan = rows_with_sample_plan(rows, existing, M_SAMPLES)
+
+    if not plan:
         print(f"{model_cfg['name']}: nothing to do, all {len(rows)} rows already complete")
         return
 
@@ -113,24 +123,23 @@ def run_model(model_cfg: dict, rows: list[dict], out_path: Path) -> None:
         dtype="bfloat16",
         max_model_len=MAX_MODEL_LEN,
     )
-    sampling_params = SamplingParams(
-        n=M_SAMPLES,
-        temperature=TEMPERATURE,
-        max_tokens=MAX_TOKENS,
-        logprobs=1,
-    )
 
     with open(out_path, "a") as out:
-        for i in range(0, len(todo), BATCH_SIZE):
-            batch = todo[i : i + BATCH_SIZE]
-            messages_list = [build_messages(r["text"]) for r in batch]
+        for i in range(0, len(plan), BATCH_SIZE):
+            batch = plan[i : i + BATCH_SIZE]
+            messages_list = [build_messages(row["text"]) for row, _, _ in batch]
+            sampling_params_list = [
+                SamplingParams(n=needed, temperature=TEMPERATURE, max_tokens=MAX_TOKENS, logprobs=1)
+                for _, needed, _ in batch
+            ]
             outputs = llm.chat(
                 messages_list,
-                sampling_params,
+                sampling_params_list,
                 chat_template_kwargs=model_cfg["chat_kwargs"] or None,
             )
-            for row, output in zip(batch, outputs):
-                for sample_idx, completion in enumerate(output.outputs):
+            for (row, needed, start_idx), output in zip(batch, outputs):
+                for offset, completion in enumerate(output.outputs):
+                    sample_idx = start_idx + offset
                     resp_row = {
                         "response_id": f"{row['corpus_row_id']}-{model_cfg['name']}-{sample_idx}",
                         "corpus_row_id": row["corpus_row_id"],
@@ -151,8 +160,8 @@ def run_model(model_cfg: dict, rows: list[dict], out_path: Path) -> None:
                     }
                     out.write(json.dumps(resp_row) + "\n")
             out.flush()
-            done = min(i + BATCH_SIZE, len(todo))
-            print(f"{model_cfg['name']}: batch done ({done}/{len(todo)} rows)")
+            done = min(i + BATCH_SIZE, len(plan))
+            print(f"{model_cfg['name']}: batch done ({done}/{len(plan)} rows)")
 
     del llm
     import gc
