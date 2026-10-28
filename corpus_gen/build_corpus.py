@@ -1,6 +1,8 @@
+import concurrent.futures
 import csv
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 
@@ -14,6 +16,7 @@ OUTPUT_PATH = "data/corpus.jsonl"
 
 SEEDS = [1, 2, 3]
 POOL_SWEEP = [3, 5, 10, 15, 30]
+MAX_WORKERS = int(os.environ.get("PWT_MAX_WORKERS", 8))
 
 
 def load_manifest_items() -> list[dict]:
@@ -199,6 +202,29 @@ def process_depth_item(item: dict, seed: int) -> list[dict]:
     return rows
 
 
+def build_task_list(
+    core_grid_items: list[dict], depth_items: list[dict], seeds: list[int], existing_prompt_ids: set
+) -> list[tuple[str, dict, int, str]]:
+    tasks = []
+    for item in core_grid_items:
+        for seed in seeds:
+            prompt_id = f"{item['item_id']}-s{seed}"
+            if prompt_id not in existing_prompt_ids:
+                tasks.append(("core-grid", item, seed, prompt_id))
+    for item in depth_items:
+        for seed in seeds:
+            prompt_id = f"{item['item_id']}-s{seed}"
+            if prompt_id not in existing_prompt_ids:
+                tasks.append(("depth", item, seed, prompt_id))
+    return tasks
+
+
+def run_task(label: str, item: dict, seed: int) -> list[dict]:
+    if label == "core-grid":
+        return process_core_grid_item(item, seed)
+    return process_depth_item(item, seed)
+
+
 def load_existing_prompt_ids(path: Path) -> set:
     ids = set()
     if not path.exists():
@@ -224,32 +250,33 @@ def main():
     existing_prompt_ids = load_existing_prompt_ids(out_path)
 
     total_units = (len(core_grid_items) + len(depth_items)) * len(SEEDS)
-    done = 0
+    tasks = build_task_list(core_grid_items, depth_items, SEEDS, existing_prompt_ids)
+    skipped = total_units - len(tasks)
+    if skipped:
+        print(f"{skipped} already-complete units skipped", flush=True)
 
+    translator.load_model()
+    embedding._load()
+
+    done = skipped
     with open(out_path, "a") as out:
-        for item in core_grid_items:
-            for seed in SEEDS:
-                prompt_id = f"{item['item_id']}-s{seed}"
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS)
+        try:
+            future_to_task = {
+                executor.submit(run_task, label, item, seed): (label, prompt_id) for label, item, seed, prompt_id in tasks
+            }
+            for future in concurrent.futures.as_completed(future_to_task):
+                label, prompt_id = future_to_task[future]
+                rows = future.result()
                 done += 1
-                if prompt_id in existing_prompt_ids:
-                    print(f"[{done}/{total_units}] skip (already have) {prompt_id}")
-                    continue
-                print(f"[{done}/{total_units}] core-grid {prompt_id}")
-                for row in process_core_grid_item(item, seed):
-                    out.write(json.dumps(row) + "\n")
+                print(f"[{done}/{total_units}] {label} {prompt_id}", flush=True)
+                out.write("".join(json.dumps(row) + "\n" for row in rows))
                 out.flush()
-
-        for item in depth_items:
-            for seed in SEEDS:
-                prompt_id = f"{item['item_id']}-s{seed}"
-                done += 1
-                if prompt_id in existing_prompt_ids:
-                    print(f"[{done}/{total_units}] skip (already have) {prompt_id}")
-                    continue
-                print(f"[{done}/{total_units}] depth {prompt_id}")
-                for row in process_depth_item(item, seed):
-                    out.write(json.dumps(row) + "\n")
-                out.flush()
+        except BaseException:
+            executor.shutdown(wait=False, cancel_futures=True)
+            raise
+        else:
+            executor.shutdown(wait=True)
 
     print(f"\nDone. Corpus written to {out_path}")
 
