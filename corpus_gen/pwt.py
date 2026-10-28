@@ -65,6 +65,12 @@ _POOL_30 = _POOL_15 + [
 
 POOL_TIERS = {3: _POOL_3, 5: _POOL_5, 10: _POOL_10, 15: _POOL_15, 30: _POOL_30}
 
+
+def sample_pool(pool_size: int, item_id: str, seed: int) -> list[str]:
+    rng = random.Random(f"{item_id}|{seed}|{pool_size}")
+    return rng.sample(POOL_TIERS[30], pool_size)
+
+
 DEFAULT_RETENTION_P = 0.15
 
 

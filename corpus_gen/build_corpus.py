@@ -169,15 +169,15 @@ def process_core_grid_item(item: dict, seed: int) -> list[dict]:
     rows = [gen0_row(item, seed, prompt_id)]
 
     for pool_size in (3, 5, 15):
-        pool = pwt.POOL_TIERS[pool_size]
+        pool = pwt.sample_pool(pool_size, item["item_id"], seed)
         traj = pwt.pwt_generate(item["text"], pool=pool, iterations=1, seed=seed)
         rows.extend(rows_from_pwt_trajectory(item, seed, pool_size, pool, traj, prompt_id))
 
-    pool10 = pwt.POOL_TIERS[10]
+    pool10 = pwt.sample_pool(10, item["item_id"], seed)
     traj10 = pwt.pwt_generate(item["text"], pool=pool10, iterations=3, seed=seed)
     rows.extend(rows_from_pwt_trajectory(item, seed, 10, pool10, traj10, prompt_id))
 
-    pool30 = pwt.POOL_TIERS[30]
+    pool30 = pwt.sample_pool(30, item["item_id"], seed)
     traj30 = pwt.pwt_generate(item["text"], pool=pool30, iterations=8, seed=seed)
     rows.extend(rows_from_pwt_trajectory(item, seed, 30, pool30, traj30, prompt_id))
 
@@ -192,7 +192,7 @@ def process_depth_item(item: dict, seed: int) -> list[dict]:
     rows = [gen0_row(item, seed, prompt_id)]
 
     for pool_size in POOL_SWEEP:
-        pool = pwt.POOL_TIERS[pool_size]
+        pool = pwt.sample_pool(pool_size, item["item_id"], seed)
         traj = pwt.pwt_generate(item["text"], pool=pool, iterations=1, seed=seed)
         rows.extend(rows_from_pwt_trajectory(item, seed, pool_size, pool, traj, prompt_id))
 
