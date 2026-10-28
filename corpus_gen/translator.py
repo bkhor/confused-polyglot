@@ -24,8 +24,9 @@ def load_model(model_name: str | None = None) -> None:
     if _model is not None and _loaded_model_name == model_name:
         return
     device = get_device()
+    dtype = torch.bfloat16 if device.type == "cuda" else torch.float32
     _tokenizer = AutoTokenizer.from_pretrained(model_name)
-    _model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
+    _model = AutoModelForSeq2SeqLM.from_pretrained(model_name, torch_dtype=dtype).to(device)
     _model.eval()
     _model.generation_config.max_length = None
     _loaded_model_name = model_name

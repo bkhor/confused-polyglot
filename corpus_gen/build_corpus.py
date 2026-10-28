@@ -9,7 +9,7 @@ import yaml
 from . import embedding, pwt, roundtrip, translator
 
 MANIFEST_PATH = "data/prompts_manifest.yaml"
-XSTEST_PATH = "data/external/xstest_sample_30.csv"
+XSTEST_PATH = "data/external/xstest_sample_105.csv"
 OUTPUT_PATH = "data/corpus.jsonl"
 
 SEEDS = [1, 2, 3]

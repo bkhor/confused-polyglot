@@ -2,6 +2,8 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer
 
+from . import translator
+
 MODEL_NAME = "sentence-transformers/LaBSE"
 
 _tokenizer = None
@@ -11,14 +13,17 @@ _model = None
 def _load():
     global _tokenizer, _model
     if _model is None:
+        device = translator.get_device()
+        dtype = torch.bfloat16 if device.type == "cuda" else torch.float32
         _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-        _model = AutoModel.from_pretrained(MODEL_NAME)
+        _model = AutoModel.from_pretrained(MODEL_NAME, torch_dtype=dtype).to(device)
         _model.eval()
 
 
 def embed(texts: list[str]) -> torch.Tensor:
     _load()
-    inputs = _tokenizer(texts, return_tensors="pt", padding=True, truncation=True)
+    device = translator.get_device()
+    inputs = _tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(device)
     with torch.no_grad():
         out = _model(**inputs)
     emb = out.pooler_output
